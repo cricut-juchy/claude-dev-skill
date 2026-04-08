@@ -7,21 +7,56 @@
 Before decomposing tasks, the following architecture decisions must be confirmed and recorded in `PROJECT_CONTEXT.md`.
 **Do not proceed to task decomposition until all decisions are complete.**
 
-For each decision: follow the user's preference if stated; **if the user has no preference, Tech Lead gives a recommendation with reasoning, adopts it, and continues — do not block the flow.**
+For each decision: follow the user's preference if stated; **if the user has no preference, Tech Lead gives a recommendation with reasoning as the first "(Recommended)" option, and continues — do not block the flow.**
 
+**Use `AskUserQuestion`** to present architecture decisions as structured choices. Batch related decisions (up to 4 per call). For each decision, the Tech Lead's recommendation should be the first option with "(Recommended)".
+
+Call 1 — Core architecture:
+- header: "Auth", question: "Authentication scheme?", options: `["JWT with refresh tokens (Recommended)", "Session-based", "OAuth2 / SSO", "None"]`
+- header: "API style", question: "API design approach?", options: `["REST with JSON (Recommended)", "GraphQL", "tRPC", "gRPC"]`
+- header: "Database", question: "Database engine?", options: `["PostgreSQL (Recommended)", "MySQL", "SQLite", "MongoDB"]`
+- header: "Migration", question: "Database migration framework?", options vary by tech stack (e.g., `["Alembic (Recommended)", "Raw SQL migrations", "None — new project, no existing data"]`)
+
+Call 2 — Conventions:
+- header: "API contract", question: "Do you need an API contract document?", options: `["Yes, OpenAPI spec (Recommended)", "Yes, endpoint list", "No"]`
+- header: "Code style", question: "Code style conventions?", options vary by language (e.g., `["PEP 8 + Black (Recommended)", "Google style", "Custom — I'll specify"]`)
+- header: "Directory", question: "Project structure?", options: `["Feature-based modules (Recommended)", "Layer-based (routes/services/models)", "Monorepo with packages"]`
+
+After all decisions are confirmed, **update PROJECT_CONTEXT.md immediately — do not wait for Phase 5.**
+
+---
+
+## Skill Discovery (run after architecture decisions, before task decomposition)
+
+Based on the confirmed tech stack and project type, use the `find-skills` Skill tool to search for relevant skills that could help workers during development. Search for skills matching the chosen technologies (e.g., "React", "FastAPI", "PostgreSQL", "testing", "deployment").
+
+**Present results to the user via `AskUserQuestion` with `multiSelect: true`:**
+
+- header: "Skills", question: "These skills may be useful for this project. Which would you like to install?"
+- For each skill found, format the option label as: `"<skill name> (<downloads>) — Effectiveness: <X>% | Security: <X>%"`
+- Only include skills that meet **all** of these criteria:
+  - From a verified/known publisher
+  - No requests for sensitive data (API keys, credentials, env vars) beyond what the skill legitimately needs
+  - No network calls to unknown/suspicious endpoints
+  - No obfuscated code
+  - Security rating >= 70%
+- Rate each skill on two dimensions:
+  - **Effectiveness**: How relevant and useful is this skill for the project's tech stack and goals? (0–100%)
+  - **Security**: How trustworthy is the skill based on publisher, permissions requested, code transparency, and community adoption? (0–100%)
+
+Example options:
 ```
-Architecture Decision Checklist:
-□ Auth scheme: [JWT / Session / None] + token storage method
-□ API design spec: [endpoint naming convention / unified error format / pagination structure]
-□ Database schema: [core tables and fields (draft level)]
-□ Database migration: [is there existing data? Yes → must specify a migration framework (Python: Alembic / Node: Knex / Java: Flyway)]
-□ Full-stack project: does it need an API Contract document? (OpenAPI / endpoint list)
-□ Code style conventions: [naming rules / directory structure conventions]
-
-Confirm all decisions with the user before proceeding to task decomposition.
+["vercel-react-best-practices (12.4k) — Effectiveness: 92% | Security: 95%",
+ "tailwind-design-system (8.1k) — Effectiveness: 85% | Security: 90%",
+ "None — skip skill installation"]
 ```
 
-**Update PROJECT_CONTEXT.md immediately after architecture decisions are confirmed — do not wait for Phase 5.**
+Install selected skills **locally in the project** (into `<project-root>/.claude/commands/`, not `~/.claude/commands/`) so they are scoped to this project only. Record installed skills in `PROJECT_CONTEXT.md` under a `## Installed Skills` section.
+
+**If using external model workers** (`WORKER_DEV_AUTH_TOKEN` is set), use `AskUserQuestion` after skill selection:
+- header: "Skill injection", question: "External model workers can't load skills natively. Embed selected skill content directly into worker prompts?", options: `["Yes, embed skills in worker prompts (Recommended)", "No, skip skills for workers"]`
+
+If yes, when dispatching workers in Phase 3, read each installed skill's markdown content and append it to the worker prompt under a `## Reference Skills` section. This ensures any model — not just Claude — benefits from the skill guidelines.
 
 ---
 
@@ -72,7 +107,9 @@ When requirements conflict with existing architecture decisions in PROJECT_CONTE
    □ Issue #6 [Integration] — depends on: #3, #4, #5
    ```
 
-5. **Enter Phase 3 after user confirms priorities/order**
+5. Use `AskUserQuestion` for final confirmation:
+   - header: "Task plan", question: "Does this task breakdown and dependency order look correct?", options: `["Yes, proceed to Phase 3", "Needs changes"]`
+   - **Enter Phase 3 only after user confirms.**
 
 ---
 
@@ -82,7 +119,8 @@ When requirements conflict with existing architecture decisions in PROJECT_CONTE
 
 1. Create one Hotfix Issue directly, title format: `[Hotfix] [incident description]`
 2. Acceptance criteria only needs to cover: incident reproduction path + fix verification
-3. Present the Issue to the user for confirmation, then **immediately enter Phase 3 (single Agent, using `worker-fix.md`)**
+3. Use `AskUserQuestion` to confirm: header: "Hotfix", question: "Proceed with this hotfix issue?", options: `["Yes, start immediately", "Needs changes"]`
+4. On confirmation, **immediately enter Phase 3 (single Agent, using `worker-fix.md`)**
 4. After PR is merged, **must run the affected PR coordination step** (see Phase 4 merge section)
 
 ---
@@ -91,7 +129,8 @@ When requirements conflict with existing architecture decisions in PROJECT_CONTE
 
 1. Create one Issue directly (use the Issue template below)
 2. No task decomposition or milestone needed
-3. Present the Issue to the user for confirmation, then **immediately enter Phase 3 (single Agent)**
+3. Use `AskUserQuestion` to confirm: header: "Issue", question: "Proceed with this issue?", options: `["Yes, start Phase 3", "Needs changes"]`
+4. On confirmation, **immediately enter Phase 3 (single Agent)**
 
 ---
 

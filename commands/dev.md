@@ -48,6 +48,7 @@ By default, Worker Agents and QA Agents run using your current Claude Code sessi
 | `WORKER_DEV_TIMEOUT_MS` | No | `API_TIMEOUT_MS` | API timeout in milliseconds |
 | `WORKER_DEV_DISABLE_NONESSENTIAL` | No | `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` | Disable non-essential traffic (set to `1`) |
 
+
 QA workers use the same fields with `QA` instead of `DEV` (e.g., `WORKER_QA_AUTH_TOKEN`, `WORKER_QA_BASE_URL`).
 
 Additional workers use a numeric suffix: `WORKER_DEV_AUTH_TOKEN_2`, `WORKER_DEV_BASE_URL_2`, etc.
@@ -97,7 +98,7 @@ Detect current directory:
 - Git repo + `PROJECT_CONTEXT.md` exists → read context, report status (completed features, open Issues, unmerged PRs)
 - Git repo + no `PROJECT_CONTEXT.md` → scan directory structure, auto-generate `PROJECT_CONTEXT.md`
 
-Classify the request, explain your reasoning to the user, get confirmation, then enter the corresponding Phase:
+Classify the request, then use `AskUserQuestion` to confirm with the user:
 
 | Type | Criteria | Path |
 |------|----------|------|
@@ -107,6 +108,10 @@ Classify the request, explain your reasoning to the user, get confirmation, then
 | **Emergency Hotfix** | Live incident requiring immediate fix, cannot wait for scheduling | Phase 2 (express) → 3 → 4 → 5, **run rebase scan after merge** |
 | **Architectural Change** | Requirements overturn existing architecture decisions (e.g. replacing auth system, rewriting core module) | Phase 2 (with change impact assessment) → 3 → 3.5 → 4 → 5 |
 | **Refactoring** | Changing internal structure without adding new external behavior | Phase 2 (refactor mode) → 3 (**forced serial**: refactor before features that depend on it) → 3.5 → 4 → 5 |
+
+**Use `AskUserQuestion`** to present the classification to the user for confirmation. Show your detected type as the first option with "(Recommended)" and include 2–3 other plausible types as alternatives. Example:
+- header: "Request type"
+- options: `["New Project (Recommended)", "New Feature / Large Change", "Small Change / Bug Fix"]`
 
 **Classification rules:**
 - Emergency Hotfix: Worker Agent **must base the hotfix branch on main**, never on any feature branch

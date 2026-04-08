@@ -42,6 +42,7 @@ Select the correct prompt file based on task type, replacing `[N]` with the actu
 
 **Check environment variables first.** The dispatch method depends on whether dev worker configs are present.
 
+
 #### Option A: External model proxy (`WORKER_DEV_AUTH_TOKEN` is set)
 
 Discover all available dev workers by checking env vars in order:
@@ -56,6 +57,8 @@ Assign tasks round-robin across available dev workers:
 - ...
 
 For each worker, run via Bash with `run_in_background: true`. **Never inline secrets in commands or log output.**
+
+**Skill injection**: If the user opted to embed skills in worker prompts (see Phase 2 Skill Discovery), read each installed skill from `<project-root>/.claude/commands/` and append the content to the worker prompt under a `## Reference Skills` heading before dispatching.
 
 Step 1: Write a temporary env file (mode 600) with the mapped vars:
 
@@ -81,9 +84,30 @@ Step 2: Launch the worker, sourcing the env file and cleaning it up:
 
 ```bash
 (source "$ENV_FILE" && rm -f "$ENV_FILE" && claude -p "<full worker prompt>" \
-  --allowedTools "Bash,Read,Write,Edit,Glob,Grep") \
+  --allowedTools "Read,Write,Edit,Glob,Grep,\
+Bash(git *),Bash(gh issue *),Bash(gh pr *),Bash(gh repo *),\
+Bash(npm test*),Bash(npm run *),Bash(npm install*),Bash(npm audit*),Bash(npx *),\
+Bash(yarn test*),Bash(yarn run *),Bash(yarn install*),Bash(yarn add *),\
+Bash(pnpm test*),Bash(pnpm run *),Bash(pnpm install*),Bash(pnpm add *),\
+Bash(python -m py_compile *),Bash(python -m pytest*),Bash(python -m pip install*),\
+Bash(pip install*),Bash(pip-audit*),\
+Bash(node --check *),Bash(node *),Bash(tsc *),\
+Bash(bandit *),Bash(flake8 *),Bash(pylint *),Bash(mypy *),Bash(eslint *),\
+Bash(mkdir *),Bash(cp *),Bash(mv *),Bash(cat *),Bash(ls *),Bash(touch *),\
+Bash(chmod +x *),\
+WebSearch,WebFetch") \
   2>&1 | tee /tmp/worker-issue-N.log
 ```
+
+This allowlist covers all repo development operations:
+- **Files**: Read, Write, Edit, Glob, Grep, mkdir, cp, mv, touch, chmod
+- **Git**: all git commands, gh issue/pr/repo commands
+- **Node.js**: npm/yarn/pnpm (test, run, install, audit), npx, node, tsc
+- **Python**: pytest, py_compile, pip install, pip-audit
+- **Linters/security**: eslint, flake8, pylint, mypy, bandit
+- **Research**: WebSearch, WebFetch for looking up docs/APIs/examples
+
+Workers **cannot** run arbitrary shell commands or modify anything outside the repo.
 
 The env file is deleted before the worker starts, so secrets only exist in process memory — never in logs, command history, or process arguments.
 
