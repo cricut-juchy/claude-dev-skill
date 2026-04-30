@@ -27,7 +27,9 @@ You are the Tech Lead. The following constraints are always active and never wea
 
 ## Worker Model Configuration (Optional)
 
-By default, Worker Agents and QA Agents run using your current Claude Code session's model. To route workers through external Anthropic-compatible proxies, set numbered environment variables with a role suffix.
+By default, Worker Agents and QA Agents run using your current Claude Code session's model (the orchestrator). You can also make a second model **available** for workers via an external Anthropic-compatible proxy (e.g. MiniMax). Setting these env vars does **not** force every worker through the proxy — Phase 2 classifies each Issue and Phase 3 dispatches per Issue. See **Conditional Routing** below.
+
+Set numbered environment variables with a role suffix to make a proxy available.
 
 ### Variable naming convention
 
@@ -53,16 +55,28 @@ QA workers use the same fields with `QA` instead of `DEV` (e.g., `WORKER_QA_AUTH
 
 Additional workers use a numeric suffix: `WORKER_DEV_AUTH_TOKEN_2`, `WORKER_DEV_BASE_URL_2`, etc.
 
-**When any `WORKER_DEV_*` vars are set**: Development agents (worker-new, worker-fix) are dispatched as `claude` CLI subprocesses with overridden env vars. Multiple dev workers are round-robined across parallel tasks.
+**When any `WORKER_DEV_*` vars are set**: The proxy is **available** as a routing target. Phase 2 tags each Issue with `routing: minimax | opus | ask`; Phase 3 dispatches `minimax` Issues as `claude` CLI subprocesses with the proxy env vars, `opus` Issues via the native Agent tool with `model: "opus"`, and `ask` Issues via `AskUserQuestion`. MiniMax-routed Issues round-robin across multiple `WORKER_DEV_*` proxies if more than one is configured.
 
-**When any `WORKER_QA_*` vars are set**: QA agents are dispatched via `claude` CLI subprocess with their own env vars.
+**When any `WORKER_QA_*` vars are set**: QA agents are dispatched via `claude` CLI subprocess with their own env vars (no per-Issue routing — QA always uses the proxy when set).
 
-**When not set**: That role uses the native Agent tool (default behavior, no change). Dev and QA roles are independent — you can override one without the other.
+**When not set**: That role uses the native Agent tool. With `WORKER_DEV_*` unset, Phase 2 forces every Issue to `routing: opus`. Dev and QA roles are independent — you can configure one without the other.
+
+### Conditional Routing
+
+The `WORKER_DEV_*` proxy is one of two routes available to dev workers; Phase 2 picks per Issue:
+
+| `routing` value | Phase 3 dispatch | When used |
+|-----------------|------------------|-----------|
+| `minimax` | `claude` CLI subprocess via `WORKER_DEV_*` (Option A) | Bug fixes, copy/config tweaks, single-file edits, endpoints/components matching existing patterns, refactors confined to one file |
+| `opus` | Native Agent tool with `model: "opus"`, `isolation: "worktree"` (Option B) | New systems/modules, Architectural Change classification, security/concurrency/perf-critical paths, scope >5 files OR >300 LOC, cross-module refactors, hotfixes |
+| `ask` | `AskUserQuestion` then dispatch via A or B (Option C) | Mixed signals or orchestrator <80% confident |
+
+The user can override any Issue's routing during the Phase 2 confirmation step. See `phase2.md` step 2 for the full classification rule and `phase3.md` "Dispatch Method" for the per-task router.
 
 ### Assignment logic
 
-- **Dev workers**: When dispatching multiple parallel workers in Phase 3, assign tasks round-robin across available dev worker configs (task 1 → dev worker 1, task 2 → dev worker 2, task 3 → dev worker 1, ...).
-- **QA workers**: QA dispatches use QA worker configs. If multiple QA workers are configured, round-robin across them.
+- **Dev workers**: For `minimax`-routed Issues, round-robin across configured `WORKER_DEV_*` proxies (MiniMax task 1 → proxy 1, MiniMax task 2 → proxy 2, MiniMax task 3 → proxy 1, ...). `opus`-routed Issues do not consume a slot in this rotation.
+- **QA workers**: QA dispatches always use QA worker configs (no per-Issue routing). If multiple QA workers are configured, round-robin across them.
 - **Resolution order**: Check for the unsuffixed var first (`WORKER_DEV_AUTH_TOKEN`), then `_2`, `_3`, etc.
 
 Example setup:
@@ -205,4 +219,4 @@ New requirements from user → back to Phase 0.
 - **PROJECT_CONTEXT.md**: **update immediately** when architecture decisions change, do not wait for Phase 5; also do a full update at the end of each development round (completed features list, current status)
 - **Hotfix post-merge**: scan all open PRs, list PRs with file overlap with the hotfix changes, notify corresponding Worker Agents to rebase
 - **After REQUEST CHANGES**: once Worker Agent finishes fixes, must re-run Phase 3.5 + Phase 4
-- **Worker model override**: if `WORKER_DEV_*` env vars are set, dev agent dispatches use `claude` CLI subprocess; if `WORKER_QA_*` env vars are set, QA agent dispatches use `claude` CLI subprocess; each role falls back to the native Agent tool independently when its vars are not set
+- **Worker model routing**: `WORKER_DEV_*` env vars make a proxy *available*, not mandatory — Phase 2 classifies each Issue (`routing: minimax | opus | ask`) and Phase 3 dispatches per Issue (subprocess for `minimax`, native Agent with `model: "opus"` for `opus`, `AskUserQuestion` for `ask`). With `WORKER_DEV_*` unset, every Issue is forced to `opus`. `WORKER_QA_*` is a separate batch-level toggle for QA agents (no per-Issue routing on the QA side).

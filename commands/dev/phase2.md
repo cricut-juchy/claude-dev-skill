@@ -79,7 +79,26 @@ When requirements conflict with existing architecture decisions in PROJECT_CONTE
    - Dependencies on other tasks are clear
    - **Identify cross-task shared infrastructure** (DB connection layer, auth middleware, shared utils, API client wrappers) — create a separate Issue for each, marking them as prerequisites for other tasks
 
-2. **For new projects**, execute on GitHub:
+2. **Worker Routing Classification** — for each task identified above, tag a `routing` field with exactly one of `minimax` | `opus` | `ask`. Phase 3 reads this field to choose the dispatch method per task.
+
+   **Force `opus` if ANY of these triggers fire:**
+   - New system / module (auth, payments, sync engine, anything introducing a new architectural component rather than extending an existing one)
+   - Phase 0 classified the request as **Architectural Change** → every task in the breakdown defaults to `opus`
+   - Touches security-sensitive code, concurrency primitives, or performance-critical paths
+   - Estimated >5 files OR >300 LOC, OR a refactor crossing module boundaries
+
+   **Default to `minimax` for clearly scoped work** (none of the triggers fire and the task is well-bounded):
+   - Bug fix, copy / config tweak, single-file edit
+   - New endpoint or component matching an existing pattern
+   - Refactor confined to one file or module under 300 LOC
+
+   **Use `ask`** when the task has mixed signals or you are not at least 80% confident in either route. Phase 3 will surface `AskUserQuestion` before dispatching that task so the user picks.
+
+   **Fallback**: if `WORKER_DEV_AUTH_TOKEN` is not set in the orchestrator environment, force every task to `routing: opus` — MiniMax is not available.
+
+   Record the routing in each Issue body under a `## Worker Routing` heading (value plus a one-line reason) so it survives the handoff to Phase 3.
+
+3. **For new projects**, execute on GitHub:
    - `gh repo create [project-name] --private` to create the repo
    - Create Issue #1 with PRD content (title: `[PRD] Product Requirements Document`)
    - Create `PROJECT_CONTEXT.md` in the repo root (use template at `~/.claude/commands/dev/PROJECT_CONTEXT_TEMPLATE.md`)
@@ -87,29 +106,30 @@ When requirements conflict with existing architecture decisions in PROJECT_CONTE
    - Create a corresponding Issue for each development task (use the Issue template below)
    - Create a milestone linking all Issues
 
-3. **For existing projects**:
+4. **For existing projects**:
    - Read `PROJECT_CONTEXT.md` to restore context
    - Create Issues for new requirements (use the Issue template below)
    - Update milestone
 
-4. Present the task list for user confirmation using the explicit dependency format:
+5. Present the task list for user confirmation using the explicit dependency format. Show the `routing` value (and reason if non-obvious) on every Issue line:
    ```
    Task List (N total):
 
    [Infrastructure Layer — must complete first, other tasks depend on it]
-   □ Issue #1 [Infrastructure task] — output: xxx — blocks: #3, #4, #5
+   □ Issue #1 [Infrastructure task] — routing: opus (cross-module shared infra) — output: xxx — blocks: #3, #4, #5
 
    [Parallel Development Layer]
-   □ Issue #3 [Feature A] — output: xxx — depends on: #1 — can parallel with #4
-   □ Issue #4 [Feature B] — output: xxx — depends on: #1 — can parallel with #3
+   □ Issue #3 [Feature A] — routing: minimax — output: xxx — depends on: #1 — can parallel with #4
+   □ Issue #4 [Feature B] — routing: ask (touches auth helpers, scope unclear) — output: xxx — depends on: #1 — can parallel with #3
 
    [Closing Layer — after all features complete]
-   □ Issue #6 [Integration] — depends on: #3, #4, #5
+   □ Issue #6 [Integration] — routing: opus (>5 files, cross-module) — depends on: #3, #4, #5
    ```
 
-5. Use `AskUserQuestion` for final confirmation:
-   - header: "Task plan", question: "Does this task breakdown and dependency order look correct?", options: `["Yes, proceed to Phase 3", "Needs changes"]`
-   - **Enter Phase 3 only after user confirms.**
+6. Use `AskUserQuestion` for final confirmation. Make clear that the user can override routing on any Issue before Phase 3 starts:
+   - header: "Task plan", question: "Does this task breakdown, routing, and dependency order look correct?", options: `["Yes, proceed to Phase 3", "Change routing on one or more Issues", "Needs changes"]`
+   - If "Change routing": ask which Issue(s) and the new routing value, update the Issue body, then re-present the list.
+   - **Enter Phase 3 only after the user confirms with "Yes, proceed to Phase 3".**
 
 ---
 
@@ -119,9 +139,10 @@ When requirements conflict with existing architecture decisions in PROJECT_CONTE
 
 1. Create one Hotfix Issue directly, title format: `[Hotfix] [incident description]`
 2. Acceptance criteria only needs to cover: incident reproduction path + fix verification
-3. Use `AskUserQuestion` to confirm: header: "Hotfix", question: "Proceed with this hotfix issue?", options: `["Yes, start immediately", "Needs changes"]`
-4. On confirmation, **immediately enter Phase 3 (single Agent, using `worker-fix.md`)**
-4. After PR is merged, **must run the affected PR coordination step** (see Phase 4 merge section)
+3. **Worker Routing**: hotfixes always tag `routing: opus` — live incidents are not the place to test cheaper models.
+4. Use `AskUserQuestion` to confirm: header: "Hotfix", question: "Proceed with this hotfix issue?", options: `["Yes, start immediately", "Needs changes"]`
+5. On confirmation, **immediately enter Phase 3 (single Agent, using `worker-fix.md`)**
+6. After PR is merged, **must run the affected PR coordination step** (see Phase 4 merge section)
 
 ---
 
@@ -129,8 +150,9 @@ When requirements conflict with existing architecture decisions in PROJECT_CONTE
 
 1. Create one Issue directly (use the Issue template below)
 2. No task decomposition or milestone needed
-3. Use `AskUserQuestion` to confirm: header: "Issue", question: "Proceed with this issue?", options: `["Yes, start Phase 3", "Needs changes"]`
-4. On confirmation, **immediately enter Phase 3 (single Agent)**
+3. Apply the **Worker Routing Classification** rule from Full Mode step 2 to the single Issue. Most lightweight tasks default to `routing: minimax`; escalate to `opus` only if a trigger fires (e.g. the bug is in security or perf-critical code).
+4. Use `AskUserQuestion` to confirm: header: "Issue", question: "Proceed with this issue (routing: <value>)?", options: `["Yes, start Phase 3", "Change routing", "Needs changes"]`
+5. On confirmation, **immediately enter Phase 3 (single Agent)**
 
 ---
 
@@ -168,4 +190,8 @@ Example: POST /auth/register with existing email → returns 409, body contains 
 
 ## Out of Scope
 [Explicit exclusions to prevent scope creep]
+
+## Worker Routing
+routing: [minimax | opus | ask]
+reason: [one-line justification — which trigger fired, or why it's clearly trivial]
 ```
