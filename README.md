@@ -64,6 +64,18 @@ Claude (Tech Lead)
 - **Post-merge PR coordination**: after every merge, scans open PRs and notifies branches that need rebase
 - **Security gate**: `bandit` + `pip-audit` / `npm audit` run mandatorily before Review
 - **Database migration guard**: direct DDL operations (ALTER TABLE / DROP COLUMN) trigger mandatory veto
+- **Git Autonomy Gate**: designed for auto-approved permission modes — push, PR creation, and merge are gated behind explicit in-conversation confirmation by default (`Gated` / `PR auto, merge gated` / `Full auto`, persisted per-project in `PROJECT_CONTEXT.md`)
+
+### Discipline Subskills
+
+Four reusable disciplines are appended to agent prompts at dispatch time:
+
+- **`grilling.md`** — requirements interviewing: look up facts yourself, put every decision to the user; sharpen fuzzy domain terms into a glossary; record only decisions that pass the hard-to-reverse / surprising / real-trade-off test
+- **`debugging.md`** — bug-fix rigor: build a red feedback loop before theorizing, minimise the repro, 3–5 ranked falsifiable hypotheses, one variable at a time, three-strikes escalation to Tech Lead, tagged `[DEBUG-...]` instrumentation with mandatory cleanup
+- **`code-review-reception.md`** — receiving REQUEST CHANGES: verify feedback against the codebase before implementing, clarify all unclear items first, YAGNI-check "implement properly" suggestions, push back with evidence, no performative agreement
+- **`verification.md`** — evidence before claims: no completion claim without fresh command output; regression tests must be red-green verified (pass → revert fix → fail → restore → pass); agent success reports are claims, not evidence
+
+*(Derived from the strongest ideas in [obra/superpowers](https://github.com/obra/superpowers) and [mattpocock/skills](https://github.com/mattpocock/skills), both MIT-licensed, merged and adapted to this SOP's Tech Lead / Worker / QA roles.)*
 
 ---
 
@@ -101,6 +113,10 @@ Copy all files from `commands/` into `~/.claude/commands/`, keeping the director
     worker-new.md
     worker-fix.md
     qa-agent.md
+    grilling.md
+    debugging.md
+    code-review-reception.md
+    verification.md
     PROJECT_CONTEXT_TEMPLATE.md
 ```
 
@@ -137,6 +153,10 @@ claude-dev-skill/
 │       ├── worker-new.md
 │       ├── worker-fix.md
 │       ├── qa-agent.md
+│       ├── grilling.md
+│       ├── debugging.md
+│       ├── code-review-reception.md
+│       ├── verification.md
 │       └── PROJECT_CONTEXT_TEMPLATE.md
 ```
 

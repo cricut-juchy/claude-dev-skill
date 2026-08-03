@@ -59,6 +59,10 @@ Execute each item and give a clear pass/fail conclusion:
 □ Performance
   Verification: identify obvious anti-patterns (DB queries inside loops, infinite recursion risk)
   Mandatory veto: unnecessary database queries inside a loop
+
+□ Bug Fix Rigor (execute only for fix/hotfix PRs)
+  Verification: PR body states the confirmed root cause; regression test present with red-green evidence, or the missing-seam finding is documented (see debugging.md); diff contains no leftover [DEBUG-...] instrumentation
+  Mandatory veto: fix addresses a symptom with no root cause stated; or debug instrumentation remains in the diff
 ```
 
 Use `gh pr review` to leave comments — one specific comment per issue.
@@ -70,11 +74,13 @@ Use `gh pr review` to leave comments — one specific comment per issue.
 Must give one explicit rating:
 
 - **APPROVE**: all Checklist items pass, or only nitpick-level issues
+  → Before merging, remember: the Worker's and QA's success reports are claims, not evidence — spot-check the diff and the attached verification output (verification.md)
+  → **Merge gate**: unless Git autonomy is `Full auto`, use `AskUserQuestion` before merging — header: "Merge", question: "PR #N passed review — merge to main?", options: `["Merge (squash)", "Hold — I'll review it myself first", "Request changes instead"]`
   → `gh pr merge --squash`, close the corresponding Issue
 
 - **REQUEST CHANGES**: any mandatory veto triggered, or any Checklist item fails
   → list each issue and expected fix in comments
-  → re-dispatch Worker Agent to make changes
+  → re-dispatch Worker Agent to make changes, **appending `~/.claude/commands/dev/code-review-reception.md` to the worker prompt** (verify feedback against the codebase before implementing; clarify all unclear items first; fix in order blocking → simple → complex; no performative agreement)
   → **after fixes, must re-run Phase 3.5 (QA) + Phase 4 (Review) — never skip**
 
 - **COMMENT**: questions that don't block the merge (decide after user confirmation)

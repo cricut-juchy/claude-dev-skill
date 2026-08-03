@@ -22,7 +22,7 @@ Call 2 — Conventions:
 - header: "Code style", question: "Code style conventions?", options vary by language (e.g., `["PEP 8 + Black (Recommended)", "Google style", "Custom — I'll specify"]`)
 - header: "Directory", question: "Project structure?", options: `["Feature-based modules (Recommended)", "Layer-based (routes/services/models)", "Monorepo with packages"]`
 
-After all decisions are confirmed, **update PROJECT_CONTEXT.md immediately — do not wait for Phase 5.**
+After all decisions are confirmed, **update PROJECT_CONTEXT.md immediately — do not wait for Phase 5.** Record a "why" line with each decision when it is hard to reverse, surprising without context, and the result of a real trade-off (see grilling.md — all three must hold; otherwise the decision line alone is enough).
 
 ---
 
@@ -99,7 +99,7 @@ When requirements conflict with existing architecture decisions in PROJECT_CONTE
    Record the routing in each Issue body under a `## Worker Routing` heading (value plus a one-line reason) so it survives the handoff to Phase 3.
 
 3. **For new projects**, execute on GitHub:
-   - `gh repo create [project-name] --private` to create the repo
+   - `gh repo create [project-name] --private` to create the repo — **unless Git autonomy is `Full auto`, confirm via `AskUserQuestion` first** (repo creation is outward-facing and visible to the org)
    - Create Issue #1 with PRD content (title: `[PRD] Product Requirements Document`)
    - Create `PROJECT_CONTEXT.md` in the repo root (use template at `~/.claude/commands/dev/PROJECT_CONTEXT_TEMPLATE.md`)
    - If API Contract needed: create `API_CONTRACT.md` with all endpoint definitions, as shared constraint for frontend/backend Issues
@@ -164,6 +164,11 @@ Refactoring tasks must satisfy:
    - Regression metric: `full test pass rate → 100%, no new lint errors`
 2. Refactoring Issues **must be placed in the Infrastructure Layer**; all feature Issues that depend on the refactored module are marked as depending on it, **must not be parallelized**; feature Issues that do NOT depend on the refactored module may run in parallel
 3. Worker Agent uses `worker-fix.md`; self-check must focus on: no breaking changes to any existing callers
+4. **Wide refactors (many call sites) use expand–contract sequencing** across Issues instead of one big-bang change:
+   - *Expand*: introduce the new interface alongside the old one (own Issue, merges first, breaks nothing)
+   - *Migrate*: move callers over in parallelizable batches (one Issue per batch — these CAN run in parallel since the new interface is stable)
+   - *Contract*: delete the old interface once all callers are migrated (final Issue, depends on all migration Issues)
+   This turns a serialized refactor into mostly-parallel work and keeps every intermediate merge green.
 
 ---
 

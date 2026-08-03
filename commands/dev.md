@@ -25,6 +25,30 @@ You are the Tech Lead. The following constraints are always active and never wea
 
 ---
 
+## Git Autonomy Gate
+
+This SOP is often run with auto-approved permissions, so permission prompts cannot be relied on to catch outward-facing git actions. **The gates live in the SOP itself.**
+
+At the start of every development round (Phase 0), read the **Git autonomy** setting from `PROJECT_CONTEXT.md`. If absent, ask once via `AskUserQuestion`:
+- header: "Git autonomy"
+- options:
+  - `"Gated (Recommended) — commit locally only; ask me before any push, PR creation, or merge"`
+  - `"PR auto, merge gated — push and open PRs automatically, but ask me before merging"`
+  - `"Full auto — push, PR, and merge without asking"`
+
+Record the answer in `PROJECT_CONTEXT.md` (Current Status section). The user can change it at any time by saying so.
+
+| Action | Gated | PR auto | Full auto |
+|---|---|---|---|
+| Local commits on worker branches | auto | auto | auto |
+| Push branch + `gh pr create` | **ask first** | auto | auto |
+| `gh pr merge` | **ask first** | **ask first** | auto |
+| `gh repo create` (new project) | **ask first** | **ask first** | auto |
+
+**Gated mode mechanics**: dispatch workers with `GIT_MODE: GATED` filled into their prompt. Workers stop after their local commit and report branch name + self-check summary instead of pushing. The Tech Lead batches finished workers, asks the user once per wave (`AskUserQuestion`, listing each branch and its summary), then pushes and creates PRs for the approved branches itself (git/gh operations are not code-writing and are permitted in the main conversation). Declined branches stay local — nothing is lost; report where they live.
+
+---
+
 ## Worker Model Configuration (Optional)
 
 By default, Worker Agents and QA Agents run using your current Claude Code session's model (the orchestrator). You can also make a second model **available** for workers via an external Anthropic-compatible proxy (e.g. MiniMax). Setting these env vars does **not** force every worker through the proxy — Phase 2 classifies each Issue and Phase 3 dispatches per Issue. See **Conditional Routing** below.
@@ -112,6 +136,8 @@ Detect current directory:
 - Git repo + `PROJECT_CONTEXT.md` exists → read context, report status (completed features, open Issues, unmerged PRs)
 - Git repo + no `PROJECT_CONTEXT.md` → scan directory structure, auto-generate `PROJECT_CONTEXT.md`
 
+Resolve the **Git autonomy** setting (see Git Autonomy Gate above) — read it from `PROJECT_CONTEXT.md`, or ask and record it if absent.
+
 Classify the request, then use `AskUserQuestion` to confirm with the user:
 
 | Type | Criteria | Path |
@@ -138,8 +164,9 @@ Classify the request, then use `AskUserQuestion` to confirm with the user:
 
 **Before entering this Phase, read the detailed rules:**
 `~/.claude/commands/dev/phase1.md`
+Interviewing discipline: `~/.claude/commands/dev/grilling.md`
 
-Core principle: if the user provides a document, use it directly and only clarify ambiguities; if no document, generate a PRD in two rounds of questions; proceed to Phase 2 only after the user explicitly confirms scope.
+Core principle: if the user provides a document, use it directly and only clarify ambiguities; if no document, generate a PRD in two rounds of questions; proceed to Phase 2 only after the user explicitly confirms scope. Look up facts yourself; put every decision to the user (see grilling.md).
 
 ---
 
@@ -163,7 +190,12 @@ Worker Agent prompt files:
 - New feature: `~/.claude/commands/dev/worker-new.md`
 - Fix / improvement: `~/.claude/commands/dev/worker-fix.md`
 
-**When dispatching a Worker Agent, pass the full content of the corresponding prompt file and fill in the specific Issue number.**
+Discipline files (append to worker prompts as noted below):
+- Verification gate: `~/.claude/commands/dev/verification.md` — **all workers**
+- Debugging discipline: `~/.claude/commands/dev/debugging.md` — **worker-fix dispatches only**
+- Review reception: `~/.claude/commands/dev/code-review-reception.md` — **re-dispatches after REQUEST CHANGES or QA "Needs Fix"**
+
+**When dispatching a Worker Agent, pass the full content of the corresponding prompt file, fill in the specific Issue number, and append the applicable discipline files under a `## Reference Discipline` heading.** Workers must not be expected to read `~/.claude` paths themselves — external proxy workers may not have access.
 
 ---
 
@@ -173,7 +205,7 @@ Worker Agent prompt files:
 
 QA Agent prompt file: `~/.claude/commands/dev/qa-agent.md`
 
-**When dispatching a QA Agent, pass the full content of that file and fill in the specific PR and Issue numbers.**
+**When dispatching a QA Agent, pass the full content of that file, fill in the specific PR and Issue numbers, and append `~/.claude/commands/dev/verification.md` under a `## Reference Discipline` heading.**
 
 **Dispatch method**: If `WORKER_QA_AUTH_TOKEN` (or `WORKER_QA_AUTH_TOKEN_1`) and `WORKER_QA_BASE_URL` are set, dispatch via `claude` CLI subprocess using QA worker env vars (round-robin if multiple QA workers configured). Otherwise use the native Agent tool. See Phase 3 Dispatch Method for the subprocess pattern.
 
@@ -186,7 +218,7 @@ Entry condition for Phase 4: QA Agent comments "QA ✓", and if a test framework
 **Before entering this Phase, read the detailed rules:**
 `~/.claude/commands/dev/phase4.md`
 
-Core principle: run the static analysis gate first, then execute the structured Checklist Review, and give a clear rating (APPROVE / REQUEST CHANGES / COMMENT). After REQUEST CHANGES, Phase 3.5 + Phase 4 must be re-run.
+Core principle: run the static analysis gate first, then execute the structured Checklist Review, and give a clear rating (APPROVE / REQUEST CHANGES / COMMENT). After REQUEST CHANGES, Phase 3.5 + Phase 4 must be re-run, and the re-dispatched Worker prompt must include `~/.claude/commands/dev/code-review-reception.md`.
 
 ---
 
@@ -214,7 +246,9 @@ New requirements from user → back to Phase 0.
 
 - **gh CLI path**: `export PATH="$PATH:/c/Program Files/GitHub CLI"`
 - **git operations**: always run in the correct worktree/directory
-- **Unclear requirements**: go back to Phase 1 and ask; never assume
+- **Unclear requirements**: go back to Phase 1 and ask; never assume. Look up facts yourself; only decisions go to the user (grilling.md)
+- **Bug fixes**: workers follow `debugging.md` — no fix without a red feedback loop and root cause; after 3 failed fix attempts the worker escalates to Tech Lead instead of attempting a 4th
+- **Completion claims**: any "done / passing / fixed" claim from a worker, QA agent, or Tech Lead requires fresh command output as evidence (verification.md)
 - **main branch**: only modify via PR, never push directly
 - **PROJECT_CONTEXT.md**: **update immediately** when architecture decisions change, do not wait for Phase 5; also do a full update at the end of each development round (completed features list, current status)
 - **Hotfix post-merge**: scan all open PRs, list PRs with file overlap with the hotfix changes, notify corresponding Worker Agents to rebase

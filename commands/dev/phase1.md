@@ -4,7 +4,11 @@
 
 ## Interactive questioning
 
-**Use `AskUserQuestion` for all user-facing questions in this phase.** Structure choices as selectable options wherever possible. Use `multiSelect: true` when the user can pick multiple items (e.g., features, constraints). Always include an "Other" option implicitly (the tool adds it automatically). Batch related questions into a single `AskUserQuestion` call (up to 4 questions per call).
+**Read `~/.claude/commands/dev/grilling.md` before asking anything** — it defines the facts-vs-decisions rule (look up facts in the environment yourself; put every decision to the user) and the domain-language sharpening discipline.
+
+**Use `AskUserQuestion` for all user-facing questions in this phase.** Structure choices as selectable options wherever possible. Use `multiSelect: true` when the user can pick multiple items (e.g., features, constraints). Always include an "Other" option implicitly (the tool adds it automatically). Batch **independent** questions into a single `AskUserQuestion` call (up to 4 per call); when one decision depends on another's answer, ask them in dependency order across calls instead of batching them blind.
+
+While interviewing, sharpen fuzzy domain terms, challenge contradictions with `PROJECT_CONTEXT.md`, and stress-test relationships with concrete edge-case scenarios (see grilling.md). Record resolved terms in the Domain Glossary section of `PROJECT_CONTEXT.md` as they crystallize.
 
 ---
 

@@ -57,6 +57,17 @@ Select the correct prompt file based on task type, replacing `[N]` with the actu
 - New feature: read `~/.claude/commands/dev/worker-new.md`
 - Fix / improvement: read `~/.claude/commands/dev/worker-fix.md`
 
+**Fill in `GIT_MODE`** in every worker prompt from the Git autonomy setting in `PROJECT_CONTEXT.md`: `GATED`, `PR_AUTO`, or `FULL`. In GATED mode, workers stop after their local commit (no push, no `gh pr create`) and the Tech Lead handles push/PR after user approval — see the Git Autonomy Gate in dev.md. Task Board status for a gated finished worker: `🔒 Committed locally — awaiting push approval`.
+
+**Append discipline files** (applies to BOTH dispatch options below — workers must never be expected to read `~/.claude` paths themselves): concatenate the applicable files under a `## Reference Discipline` heading at the end of the worker prompt.
+
+| Dispatch | Append |
+|---|---|
+| worker-new | `verification.md` |
+| worker-fix | `verification.md` + `debugging.md` |
+| any re-dispatch after REQUEST CHANGES / QA "Needs Fix" | above + `code-review-reception.md` |
+| QA agent (Phase 3.5) | `verification.md` |
+
 ### Dispatch Method
 
 **Per-task routing.** Selection happens **per Issue**, driven by the `routing` field set in Phase 2 (see `phase2.md` step 2). Read the routing value from each Issue body before dispatching:

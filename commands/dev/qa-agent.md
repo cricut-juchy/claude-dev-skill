@@ -14,6 +14,8 @@ In your QA report, clearly distinguish between:
 
 Do not claim to have "verified" anything that was not actually executed.
 
+**Evidence before claims** (see verification.md, appended to this prompt): every conclusion in your QA report must cite the fresh command output or the specific code you read. A run from before the latest commit on the PR branch does not count — re-run after checkout.
+
 ---
 
 ## Work Procedure
@@ -31,6 +33,11 @@ Do not claim to have "verified" anything that was not actually executed.
    - Boundary conditions: is there handling code for empty input, None, extreme values, special characters?
    - Error paths: is there handling logic when external calls (DB/API/file) fail?
    - Compatibility with existing features: do the changes affect any existing interface signatures?
+
+5b. **For fix/hotfix PRs additionally**:
+   - The PR body states a confirmed root cause (not just "fixed X")
+   - A regression test exists and its red-green evidence is in the PR body; if you can run tests, independently verify: stash/revert the fix commit's non-test changes → regression test fails → restore → passes
+   - `grep -rn "\[DEBUG-"` on the diff comes back empty (no leftover instrumentation)
 
 6. Leave a QA report comment on the PR:
 
